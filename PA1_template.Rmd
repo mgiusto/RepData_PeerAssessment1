@@ -20,45 +20,56 @@ data$date=as.POSIXct(data$date)
 ### Make a histogram of the total number of steps taken each day
 To have a first idea of the total number of steps taken each day it is useful to produce a histogram:
 ```{r histTotStepsPerDay}
-hist(aggregate(steps~date, data[!is.na(data$steps),],sum)$steps)
+totalStepsPerDay = aggregate(steps~date, data[!is.na(data$steps),],sum)
+hist(totalStepsPerDay$steps)
 ```
 ### Calculate and report the mean and median total number of steps taken per day
-The mean number of steps taken per day is: 
-```{r meanStepsPerDay}
-meanStepsPerDay = aggregate(steps~date, data[!is.na(data$steps),],mean)
-meanStepsPerDay$steps
+```{r meanMedianStepsPerDay}
+mean(totalStepsPerDay$steps)
+median(totalStepsPerDay$steps)
 ```
 
-The median number of steps taken per day is: 
-```{r medianStepsPerDay}
-medianStepsPerDay = aggregate(steps~date, data[!is.na(data$steps),], median)
-medianStepsPerDay
-```
+The mean number of steps taken per day is `r mean(totalStepsPerDay$steps)`, the median number of steps taken per day is `r median(totalStepsPerDay$steps)`.
 
 ## What is the average daily activity pattern?
 ### Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
-
+To understand the average daily activity pattern it is possible to plot it over the whole period:
 ```{r plotTimeSeriesAvgSteps}
 meanStepsPerInterval = aggregate(steps~interval, data, mean)
 with(meanStepsPerInterval, plot(interval, steps, type="l"))
-with(meanStepsPerInterval, interval[which(steps == max(steps,na.rm=TRUE))])
 ```
 ### Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
 ```{r intervalMaxSteps}
-meanStepsPerInterval[meanStepsPerInterval$interval == 835,]
-summary(meanStepsPerInterval)
+intervalMaxSteps = with(meanStepsPerInterval, interval[which(steps == max(steps,na.rm=TRUE))])
+intervalMaxSteps
+maxAvgSteps = meanStepsPerInterval[meanStepsPerInterval$interval == intervalMaxSteps,]
+maxAvgSteps
 ```
-
+The interval with, on average, the maximum number of steps is `r intervalMaxSteps` with `r maxAvgSteps$steps` steps.
 
 ## Imputing missing values
 ### Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
 ```{r completeCases}
-sum(!complete.cases(data))
+missingValues = sum(!complete.cases(data)) 
+missingValues
 ```
+The number of missing values is `r missingValues`.
 
 ### Devise a strategy for filling in all of the missing values in the dataset. The strategy does not need to be sophisticated. For example, you could use the mean/median for that day, or the mean for that 5-minute interval, etc.
-Prendo la media dei gg dello stesso tipo alla stessa ora
+To fill the missing values it is possible to substitute them with the average number of steps, at the same interval, on the other days of the same kind (weekday days or weekend days).
 ### Create a new dataset that is equal to the original dataset but with the missing data filled in
+To create the new dataset we define a function that calculates if a day is a weekday day or a weekend day.
+```{r functionIsWeekend}
+isWeekend <- function(date){
+  day <- weekdays(date)
+  if (day %in% c("Saturday","Sunday")){
+    return("weekend")
+  }else{
+    return("weekday")
+  }
+}
+```
+It is now possible to calculate the dataset with the missing values filled in. To do so we use the nvl function (here defined) to get the first not null values of a vector (of length 2) of number.
 ```{r fillMissingValues,echo=FALSE, results="hide"}
 nvl <- function(vals){
   print(vals)
@@ -69,15 +80,6 @@ nvl <- function(vals){
   }
 }
 
-isWeekend <- function(date){
-  day <- weekdays(date)
-  if (day %in% c("Saturday","Sunday")){
-    return("weekend")
-  }else{
-    return("weekday")
-  }
-}
-
 data$isWeekend <- as.factor(sapply(data$date, isWeekend))
 meanStepsPerIntervalWeekday = aggregate(steps~interval+isWeekend, data, mean)
 dataImputed = merge(data, meanStepsPerIntervalWeekday, by = c("isWeekend","interval"))
@@ -85,15 +87,21 @@ dataImputed$steps = apply(cbind(dataImputed$steps.x,dataImputed$steps.y), 1, nvl
 ```
 
 ### Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+It is now possible to compare the values of the dataset with the missing values filled in with the one with the NA, calculated before.
 ```{r analysisImputedValues}
-hist(aggregate(steps~date, dataImputed[!is.na(dataImputed$steps),],sum)$steps)
+totalStepsPerDayImputed = aggregate(steps~date, dataImputed[!is.na(dataImputed$steps),],sum)
+hist(totalStepsPerDayImputed$steps)
+mean(totalStepsPerDayImputed$steps)
+median(totalStepsPerDayImputed$steps)
 ```
-
+The mean of the total number of steps taken per day passes from `r mean(totalStepsPerDay$steps)` to `r mean(totalStepsPerDayImputed$steps)`,  the median number of steps taken per day passes from `r median(totalStepsPerDay$steps)` to `r median(totalStepsPerDayImputed$steps)`. We have then an increase in the mean, while the median decrease.
 
 ## Are there differences in activity patterns between weekdays and weekends?
 ### Create a new factor variable in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day.
-Già fatto
+To create the factor variable representing if a day is a weekday day or a weekend day it is possible to use the isWeekend function defined above.
+
 ### Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). The plot should look something like the following, which was creating using simulated data: 
+To better compare the activities during weekday day and weekend days it is possible to visualize the two trends:
 ```{r comparisonWeekdayWeekend}
 library(lattice)
 xyplot(steps~interval | isWeekend, meanStepsPerIntervalWeekday, layout = c(1,2),type="l")
